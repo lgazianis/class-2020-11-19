@@ -36,16 +36,64 @@ week_11_folds <- vfold_cv(week_11_train, v = 5)
 
 * Come up with at least two models that a) you like and would be willing to defend and b) are somewhat different from one another. The two most common model types in these situations are "simple" and "full". The former includes a minimum number of variables. The latter errs on the side of variable inclusion and the creation of interaction terms.
 
+```{r sc1}
+
+s1.1 <- stan_glm(data = week_11,
+                 primary_06 ~ primary_02 + general_02,
+                 refresh = 0) %>%
+  print(digits = 5)
+
+s1.2 <- stan_glm(data = week_11,
+                 primary_06 ~ age + sex,
+                 refresh = 0) %>%
+  print(digits = 5)
+
+s1.3 <- stan_glm(data = week_11,
+                 primary_06 ~ solo + primary_02 + primary_04 + age + age*solo,
+                 refresh = 0) %>% 
+  print(digits = 5)
+
+```
+
+
 * Which data set should we use for this? Why?
-
+Week_11 is a sample with 10,000 observations of the dataset shaming. We should use week_11 because 1)
+it is more useful to use just a sample to fit a model to a population.
 * What does it mean if, for example, the coefficient of `treatmentNeighbors` varies across models?
-
+If this coefficient varies across models, it means that treatment is being affected differently
+by the different variables in the formula for the models.
 * Do things change if we start using all the data? Is there a danger in doing so?
-
+The data may be overfit and not as useful as a predictive tool. While it will 
+reflect the past with complete accuracy, it may cease to be an effective predictor.
 
 ## Scene 2
 
 **Prompt:** Compare your two models using cross-validation.
+
+```{r sc2}
+
+wf_1.1 <- workflow() %>%
+  add_model(linear_reg() %>%
+              set_engine("stan")) %>%
+  add_recipe(recipe(primary_06 ~ primary_02 + general_02,
+                    data = week_11))
+
+wf_1.1 %>% 
+  fit_resamples(resamples = week_11_folds) %>%
+  collect_metrics()
+
+wf_1.2 <- workflow() %>%
+  add_model(linear_reg() %>%
+              set_engine("stan")) %>%
+  add_recipe(recipe(primary_06 ~ solo + primary_02 + primary_04 + age,
+                    data = week_11) %>%
+                step_interact(~age*solo))
+
+wf_1.2 %>%
+  fit_resamples(resamples = week_11_folds) %>%
+  collect_metrics()
+  
+```
 
 
 ## Scene 3
@@ -54,6 +102,82 @@ week_11_folds <- vfold_cv(week_11_train, v = 5)
 
 * If you have time, redo all the important steps above with the full data set.
 
+```{r sc3}
+
+fit_1.1 <- wf_1.1 %>%
+  fit(week_11_train) %>% 
+  predict(new_data = week_11_test) %>%
+  bind_cols(week_11_test %>% 
+              select(primary_06)) %>%
+  metrics(truth = primary_06, estimate = `.pred`)
+  
+
+fit_1.2 <- wf_1.2 %>%
+  fit(week_11_train) %>%
+  predict(new_data = week_11_test) %>%
+  bind_cols(week_11_test %>%
+              select(primary_06)) %>%
+  metrics(truth = primary_06, estimate = `.pred`)
+
+```
+
+
+```{r sc3 optional}
+
+shaming_split <- initial_split(shaming)
+shaming_train <- training(shaming_split)
+shaming_test <- testing(shaming_split)
+shaming_folds <- vfold_cv(shaming_train, v = 5)
+
+s1.1 <- stan_glm(data = shaming,
+                 primary_06 ~ primary_02 + general_02,
+                 refresh = 0) %>%
+  print(digits = 5)
+
+s1.2 <- stan_glm(data = shaming,
+                 primary_06 ~ solo + primary_02 + primary_04 + age + age*solo,
+                 refresh = 0) %>% 
+  print(digits = 5)
+
+
+wf_1.1 <- workflow() %>%
+  add_model(linear_reg() %>%
+              set_engine("stan")) %>%
+  add_recipe(recipe(primary_06 ~ primary_02 + general_02,
+                    data = shaming))
+
+wf_1.1 %>% 
+  fit_resamples(resamples = shaming_folds) %>%
+  collect_metrics()
+
+wf_1.2 <- workflow() %>%
+  add_model(linear_reg() %>%
+              set_engine("stan")) %>%
+  add_recipe(recipe(primary_06 ~ solo + primary_02 + primary_04 + age,
+                    data = shaming) %>%
+                step_interact(~age*solo))
+
+wf_1.2 %>%
+  fit_resamples(resamples = shaming_folds) %>%
+  collect_metrics()
+
+
+fit_1.1 <- wf_1.1 %>%
+  fit(shaming_train) %>% 
+  predict(new_data = shaming_test) %>%
+  bind_cols(shaming_test %>% 
+              select(primary_06)) %>%
+  metrics(truth = primary_06, estimate = `.pred`)
+  
+
+fit_1.2 <- wf_1.2 %>%
+  fit(week_11_train) %>%
+  predict(new_data = shaming_test) %>%
+  bind_cols(shaming_test %>%
+              select(primary_06)) %>%
+  metrics(truth = primary_06, estimate = `.pred`)
+
+```
 
 
 ## Optional Problems
